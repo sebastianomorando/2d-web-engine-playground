@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>2D Renderer Playground</title>
+    <link rel="stylesheet" href="./styles.css" />
+    <script type="module" src="./main.ts"></script>
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="viewport-wrap" aria-label="2D renderer canvas">
+        <canvas id="renderer" width="1280" height="720"></canvas>
+        <div class="hud">
+          <span id="backend">initializing</span>
+          <span id="fps">0 fps</span>
+        </div>
+      </section>
+      <aside class="panel">
+        <h1>2D Renderer</h1>
+        <label>
+          Quads
+          <input id="quad-count" type="range" min="4" max="400" value="96" />
+          <output id="quad-count-value">96</output>
+        </label>
+        <label>
+          Motion
+          <input id="motion" type="range" min="0" max="2" step="0.05" value="1" />
+          <output id="motion-value">1.00</output>
+        </label>
+        <button id="pause" type="button">Pause</button>
+      </aside>
+    </main>
+  </body>
+</html>
