@@ -19,6 +19,9 @@ export interface SpriteVertex {
   u: number;
   v: number;
   alpha: number;
+  r?: number;
+  g?: number;
+  b?: number;
 }
 
 export interface SpriteDraw {

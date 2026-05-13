@@ -9,7 +9,7 @@ import {
 } from "./sprite-renderer";
 import { SpriteRendererInitError } from "./sprite-renderer";
 
-const FLOATS_PER_VERTEX = 5;
+const FLOATS_PER_VERTEX = 8;
 
 const SHADER = `
 struct Uniforms {
@@ -32,6 +32,7 @@ struct VertexInput {
   @location(0) position: vec2f,
   @location(1) uv: vec2f,
   @location(2) alpha: f32,
+  @location(3) color: vec3f,
 };
 
 struct VertexOutput {
@@ -39,6 +40,7 @@ struct VertexOutput {
   @location(0) uv: vec2f,
   @location(1) positionPx: vec2f,
   @location(2) alpha: f32,
+  @location(3) color: vec3f,
 };
 
 @vertex
@@ -49,6 +51,7 @@ fn vertexMain(input: VertexInput) -> VertexOutput {
   output.uv = input.uv;
   output.positionPx = input.position;
   output.alpha = input.alpha;
+  output.color = input.color;
   return output;
 }
 
@@ -59,7 +62,8 @@ fn heightAt(uv: vec2f) -> f32 {
 
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
-  let texel = textureSample(spriteTexture, spriteSampler, input.uv);
+  var texel = textureSample(spriteTexture, spriteSampler, input.uv);
+  texel = vec4f(texel.rgb * input.color, texel.a);
   let dimensions = vec2f(textureDimensions(spriteTexture));
   let texelSize = 1.0 / max(dimensions, vec2f(1.0));
   let left = heightAt(input.uv - vec2f(texelSize.x, 0.0));
@@ -181,6 +185,11 @@ export class WebGpuSpriteRenderer implements SpriteRenderer {
                 shaderLocation: 2,
                 offset: 4 * Float32Array.BYTES_PER_ELEMENT,
                 format: "float32",
+              },
+              {
+                shaderLocation: 3,
+                offset: 5 * Float32Array.BYTES_PER_ELEMENT,
+                format: "float32x3",
               },
             ],
           },
@@ -321,6 +330,9 @@ export class WebGpuSpriteRenderer implements SpriteRenderer {
         data[cursor++] = vertex.u;
         data[cursor++] = vertex.v;
         data[cursor++] = vertex.alpha;
+        data[cursor++] = vertex.r ?? 1;
+        data[cursor++] = vertex.g ?? 1;
+        data[cursor++] = vertex.b ?? 1;
       }
 
       drawCommands.push({ texture, firstVertex, vertexCount: draw.vertices.length });

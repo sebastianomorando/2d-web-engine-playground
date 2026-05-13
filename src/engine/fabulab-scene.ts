@@ -58,6 +58,26 @@ interface ProjectedPoint {
   y: number;
 }
 
+interface Vec3 {
+  x: number;
+  y: number;
+  z: number;
+}
+
+interface Color {
+  r: number;
+  g: number;
+  b: number;
+}
+
+interface MeshTriangle {
+  a: Vec3;
+  b: Vec3;
+  c: Vec3;
+  color: Color;
+  alpha?: number;
+}
+
 type Point2 = ProjectedPoint;
 type AtlasFrameId = keyof typeof FABULAB_SCENE_FRAMES;
 
@@ -96,8 +116,15 @@ interface ProjectedLayer extends ProjectionBasis {
 
 const DESIGN_WIDTH = 1260;
 const DESIGN_HEIGHT = 682;
+const SOLID_TEXTURE_SOURCE = {
+  id: "solid",
+  url: "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 1 1'%3E%3Crect width='1' height='1' fill='white'/%3E%3C/svg%3E",
+  logicalWidth: 1,
+  logicalHeight: 1,
+} as const;
 
 export const FABULAB_TEXTURE_SOURCES: readonly SpriteTextureSource[] = [
+  SOLID_TEXTURE_SOURCE,
   FABULAB_SCENE_ATLAS_SOURCE,
   { id: "cielo", url: cieloUrl, logicalWidth: 2648.95, logicalHeight: 1429.8 },
   { id: "nuvole_1", url: nuvole1Url, logicalWidth: 2206, logicalHeight: 377.46 },
@@ -178,6 +205,10 @@ export function createFabulabScene(
       zVw: fieldLayer.zVw,
       draws: projectFieldLayer(fieldLayer, viewport, pointer, time, settings),
     });
+  }
+
+  if (textureMap.has(SOLID_TEXTURE_SOURCE.id)) {
+    drawGroups.push(...createLowPolyDrawGroups(viewport, pointer, time, settings));
   }
 
   const draws = drawGroups
@@ -362,6 +393,202 @@ function projectMantle(projected: ProjectedLayer, time: number): readonly Sprite
   return draws;
 }
 
+function createLowPolyDrawGroups(
+  viewport: ViewportState,
+  pointer: PointerState,
+  time: number,
+  settings: FabulabSceneSettings,
+): Array<{ zVw: number; draws: readonly SpriteDraw[] }> {
+  return [
+    {
+      zVw: -47.8,
+      draws: [createSolidMeshDraw(createMountainMesh(), viewport, pointer, time, settings)],
+    },
+    {
+      zVw: -39.2,
+      draws: [createSolidMeshDraw(createRockMesh(), viewport, pointer, time, settings)],
+    },
+  ];
+}
+
+function createMountainMesh(): readonly MeshTriangle[] {
+  const shadow = { r: 0.5, g: 0.01, b: 0.24 };
+  const body = { r: 0.74, g: 0.02, b: 0.34 };
+  const warm = { r: 0.94, g: 0.12, b: 0.4 };
+  const dark = { r: 0.42, g: 0.0, b: 0.2 };
+
+  return [
+    ...mountainRidge(
+      [
+        { x: 500, y: 430 },
+        { x: 620, y: 332 },
+        { x: 725, y: 420 },
+        { x: 820, y: 260 },
+        { x: 965, y: 392 },
+        { x: 1115, y: 330 },
+        { x: 1280, y: 430 },
+      ],
+      536,
+      -520,
+      [shadow, body, warm, body, shadow],
+      0.34,
+    ),
+    ...mountainRidge(
+      [
+        { x: 730, y: 478 },
+        { x: 860, y: 355 },
+        { x: 980, y: 486 },
+        { x: 1110, y: 370 },
+        { x: 1265, y: 470 },
+      ],
+      565,
+      -360,
+      [dark, shadow, body, warm],
+      0.28,
+    ),
+  ];
+}
+
+function mountainRidge(
+  ridge: readonly Point2[],
+  baseY: number,
+  z: number,
+  colors: readonly Color[],
+  alpha: number,
+): readonly MeshTriangle[] {
+  const triangles: MeshTriangle[] = [];
+
+  for (let index = 0; index < ridge.length - 1; index++) {
+    const left = ridge[index];
+    const right = ridge[index + 1];
+    const color = colors[index % colors.length];
+    if (!left || !right || !color) {
+      continue;
+    }
+    const center = {
+      x: (left.x + right.x) * 0.5,
+      y: Math.max(left.y, right.y) + (baseY - Math.max(left.y, right.y)) * 0.55,
+      z: z + 44 + Math.sin(index * 1.7) * 16,
+    };
+    const baseLeft = { x: left.x - 24, y: baseY, z };
+    const baseRight = { x: right.x + 24, y: baseY, z };
+    const peakLeft = { x: left.x, y: left.y, z: z + 24 };
+    const peakRight = { x: right.x, y: right.y, z: z + 18 };
+
+    triangles.push(
+      { a: peakLeft, b: baseLeft, c: center, color: tint(color, 0.9), alpha },
+      { a: peakLeft, b: center, c: peakRight, color: tint(color, 1.18), alpha },
+      { a: peakRight, b: center, c: baseRight, color: tint(color, 0.72), alpha },
+    );
+  }
+
+  return triangles;
+}
+
+function createRockMesh(): readonly MeshTriangle[] {
+  return [
+    ...pebble(225, 532, 34, 18, -88, { r: 0.74, g: 0.72, b: 0.67 }),
+    ...pebble(305, 470, 28, 15, -92, { r: 0.66, g: 0.64, b: 0.6 }),
+    ...pebble(555, 580, 40, 22, -70, { r: 0.7, g: 0.67, b: 0.62 }),
+    ...pebble(725, 610, 34, 19, -62, { r: 0.62, g: 0.59, b: 0.55 }),
+    ...pebble(885, 560, 42, 24, -72, { r: 0.72, g: 0.67, b: 0.61 }),
+    ...pebble(1060, 625, 46, 25, -58, { r: 0.65, g: 0.59, b: 0.56 }),
+    ...pebble(1185, 520, 34, 20, -76, { r: 0.76, g: 0.69, b: 0.62 }),
+  ];
+}
+
+function pebble(
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  z: number,
+  color: Color,
+): readonly MeshTriangle[] {
+  const depth = width * 0.28;
+  const top = { x: x - width * 0.06, y: y - height * 0.75, z: z + depth * 0.2 };
+  const left = { x: x - width * 0.5, y: y - height * 0.18, z };
+  const right = { x: x + width * 0.5, y: y - height * 0.1, z: z + depth * 0.08 };
+  const front = { x: x + width * 0.08, y: y + height * 0.18, z: z + depth };
+  const back = { x: x - width * 0.12, y: y - height * 0.35, z: z - depth };
+  const alpha = 0.58;
+
+  return [
+    { a: top, b: left, c: back, color: tint(color, 0.82), alpha },
+    { a: top, b: back, c: right, color: tint(color, 1.16), alpha },
+    { a: top, b: right, c: front, color: tint(color, 1.02), alpha },
+    { a: top, b: front, c: left, color: tint(color, 0.92), alpha },
+    { a: left, b: front, c: right, color: tint(color, 0.72), alpha },
+  ];
+}
+
+function createSolidMeshDraw(
+  triangles: readonly MeshTriangle[],
+  viewport: ViewportState,
+  pointer: PointerState,
+  time: number,
+  settings: FabulabSceneSettings,
+): SpriteDraw {
+  const sorted = [...triangles].sort((a, b) => averageZ(a) - averageZ(b));
+  const vertices = sorted.flatMap((triangle) => {
+    const color = shadeTriangle(triangle, time);
+    return [triangle.a, triangle.b, triangle.c].map((point) => ({
+      ...projectMeshPoint(point, viewport, pointer, settings),
+      u: 0.5,
+      v: 0.5,
+      alpha: triangle.alpha ?? 0.94,
+      r: color.r,
+      g: color.g,
+      b: color.b,
+    }));
+  });
+
+  return {
+    textureId: SOLID_TEXTURE_SOURCE.id,
+    vertices,
+  };
+}
+
+function projectMeshPoint(
+  point: Vec3,
+  viewport: ViewportState,
+  pointer: PointerState,
+  settings: FabulabSceneSettings,
+): ProjectedPoint {
+  const stage = createStage(viewport);
+  const origin = { x: DESIGN_WIDTH * 0.5, y: DESIGN_HEIGHT * 0.5, z: 0 };
+  const rotated = rotateAroundOrigin(
+    point,
+    origin,
+    -pointer.x * settings.parallax * 0.2,
+    pointer.y * settings.parallax * 0.08,
+  );
+  const perspective = DESIGN_WIDTH * 0.66;
+  const depth = Math.max(0.05, perspective - rotated.z);
+  const factor = perspective / depth;
+
+  return {
+    x: stage.x + (origin.x + (rotated.x - origin.x) * factor) * stage.scale,
+    y: stage.y + (origin.y + (rotated.y - origin.y) * factor) * stage.scale,
+  };
+}
+
+function shadeTriangle(triangle: MeshTriangle, time: number): Color {
+  const normal = normalize3(cross3(sub3(triangle.b, triangle.a), sub3(triangle.c, triangle.a)));
+  const sunAngle = ((time % 64_000) / 64_000) * Math.PI * 2 - Math.PI * 0.1;
+  const light = normalize3({
+    x: Math.cos(sunAngle) * 0.55,
+    y: -Math.sin(sunAngle) * 0.35 - 0.2,
+    z: 0.85,
+  });
+  const diffuse = Math.max(0.18, dot3(normal, light) * 0.55 + 0.45);
+  return tint(triangle.color, diffuse);
+}
+
+function averageZ(triangle: MeshTriangle): number {
+  return (triangle.a.z + triangle.b.z + triangle.c.z) / 3;
+}
+
 function createProjectedLayer(
   layer: Layer,
   viewport: ViewportState,
@@ -509,6 +736,43 @@ function mixPoint(from: ProjectedPoint, to: ProjectedPoint, amount: number): Pro
   return {
     x: lerp(from.x, to.x, amount),
     y: lerp(from.y, to.y, amount),
+  };
+}
+
+function sub3(a: Vec3, b: Vec3): Vec3 {
+  return {
+    x: a.x - b.x,
+    y: a.y - b.y,
+    z: a.z - b.z,
+  };
+}
+
+function cross3(a: Vec3, b: Vec3): Vec3 {
+  return {
+    x: a.y * b.z - a.z * b.y,
+    y: a.z * b.x - a.x * b.z,
+    z: a.x * b.y - a.y * b.x,
+  };
+}
+
+function dot3(a: Vec3, b: Vec3): number {
+  return a.x * b.x + a.y * b.y + a.z * b.z;
+}
+
+function normalize3(vector: Vec3): Vec3 {
+  const length = Math.hypot(vector.x, vector.y, vector.z) || 1;
+  return {
+    x: vector.x / length,
+    y: vector.y / length,
+    z: vector.z / length,
+  };
+}
+
+function tint(color: Color, amount: number): Color {
+  return {
+    r: clamp01(color.r * amount),
+    g: clamp01(color.g * amount),
+    b: clamp01(color.b * amount),
   };
 }
 

@@ -9,7 +9,7 @@ import {
 } from "./sprite-renderer";
 import { SpriteRendererInitError } from "./sprite-renderer";
 
-const FLOATS_PER_VERTEX = 5;
+const FLOATS_PER_VERTEX = 8;
 
 const VERTEX_SHADER = `#version 300 es
 precision highp float;
@@ -17,12 +17,14 @@ precision highp float;
 in vec2 a_position;
 in vec2 a_uv;
 in float a_alpha;
+in vec3 a_color;
 
 uniform vec2 u_resolution;
 
 out vec2 v_uv;
 out vec2 v_position;
 out float v_alpha;
+out vec3 v_color;
 
 void main() {
   vec2 clip = (a_position / u_resolution) * 2.0 - 1.0;
@@ -30,6 +32,7 @@ void main() {
   v_uv = a_uv;
   v_position = a_position;
   v_alpha = a_alpha;
+  v_color = a_color;
 }`;
 
 const FRAGMENT_SHADER = `#version 300 es
@@ -48,6 +51,7 @@ uniform float u_shadow_strength;
 in vec2 v_uv;
 in vec2 v_position;
 in float v_alpha;
+in vec3 v_color;
 out vec4 out_color;
 
 float heightAt(vec2 uv) {
@@ -57,6 +61,7 @@ float heightAt(vec2 uv) {
 
 void main() {
   vec4 texel = texture(u_texture, v_uv);
+  texel.rgb *= v_color;
   vec2 texelSize = 1.0 / max(u_texture_size, vec2(1.0));
   float left = heightAt(v_uv - vec2(texelSize.x, 0.0));
   float right = heightAt(v_uv + vec2(texelSize.x, 0.0));
@@ -155,6 +160,7 @@ export class WebGlSpriteRenderer implements SpriteRenderer {
     const positionLocation = gl.getAttribLocation(program, "a_position");
     const uvLocation = gl.getAttribLocation(program, "a_uv");
     const alphaLocation = gl.getAttribLocation(program, "a_alpha");
+    const colorLocation = gl.getAttribLocation(program, "a_color");
 
     gl.enableVertexAttribArray(positionLocation);
     gl.vertexAttribPointer(positionLocation, 2, gl.FLOAT, false, stride, 0);
@@ -177,6 +183,16 @@ export class WebGlSpriteRenderer implements SpriteRenderer {
       false,
       stride,
       4 * Float32Array.BYTES_PER_ELEMENT,
+    );
+
+    gl.enableVertexAttribArray(colorLocation);
+    gl.vertexAttribPointer(
+      colorLocation,
+      3,
+      gl.FLOAT,
+      false,
+      stride,
+      5 * Float32Array.BYTES_PER_ELEMENT,
     );
 
     gl.useProgram(program);
@@ -281,6 +297,9 @@ export class WebGlSpriteRenderer implements SpriteRenderer {
         data[cursor++] = vertex.u;
         data[cursor++] = vertex.v;
         data[cursor++] = vertex.alpha;
+        data[cursor++] = vertex.r ?? 1;
+        data[cursor++] = vertex.g ?? 1;
+        data[cursor++] = vertex.b ?? 1;
       }
 
       gl.activeTexture(gl.TEXTURE0);
