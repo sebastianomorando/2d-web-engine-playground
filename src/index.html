@@ -14,21 +14,36 @@
         <div class="hud">
           <span id="backend">initializing</span>
           <span id="fps">0 fps</span>
+          <span id="asset-count">0 layers</span>
         </div>
       </section>
       <aside class="panel">
-        <h1>2D Renderer</h1>
+        <h1>Fabulab Scene</h1>
         <label>
-          Quads
-          <input id="quad-count" type="range" min="4" max="400" value="96" />
-          <output id="quad-count-value">96</output>
+          Parallax
+          <input id="parallax" type="range" min="0" max="2" step="0.01" value="0.10" />
+          <output id="parallax-value">0.10</output>
         </label>
         <label>
-          Motion
-          <input id="motion" type="range" min="0" max="2" step="0.05" value="1" />
-          <output id="motion-value">1.00</output>
+          Light FX
+          <input id="lighting" type="range" min="0" max="1" step="0.01" value="0.55" />
+          <output id="lighting-value">0.55</output>
         </label>
-        <button id="pause" type="button">Pause</button>
+        <label>
+          Day Cycle
+          <input id="day-cycle" type="range" min="0" max="4" step="0.05" value="1" />
+          <output id="day-cycle-value">1.00x</output>
+        </label>
+        <label>
+          Drift
+          <input id="drift" type="range" min="0" max="2" step="0.05" value="0.55" />
+          <output id="drift-value">0.55</output>
+        </label>
+        <label>
+          Entrance
+          <input id="entrance" type="range" min="0" max="1" step="0.01" value="1" />
+          <output id="entrance-value">1.00</output>
+        </label>
       </aside>
     </main>
   </body>

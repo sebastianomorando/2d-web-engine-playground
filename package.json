@@ -4,6 +4,7 @@
   "type": "module",
   "private": true,
   "scripts": {
+    "generate:atlas": "bun ./scripts/generate-fabulab-atlas.ts",
     "dev": "bun ./src/index.html --console",
     "build": "bun build ./src/index.html --outdir=dist --minify",
     "typecheck": "tsc --noEmit",
@@ -11,8 +12,12 @@
     "check": "bun run typecheck && bun run test && bun run build"
   },
   "devDependencies": {
+    "@resvg/resvg-js": "^2.6.2",
     "@types/bun": "latest",
+    "@types/pngjs": "^6.0.5",
     "@webgpu/types": "^0.1.70",
+    "@xmldom/xmldom": "^0.9.10",
+    "pngjs": "^7.0.0",
     "typescript": "^5.8.3"
   }
 }

@@ -19,9 +19,7 @@ body {
 }
 
 body {
-  background:
-    radial-gradient(circle at 12% 18%, rgb(35 91 78 / 0.34), transparent 28rem),
-    linear-gradient(135deg, #101216 0%, #17201e 54%, #251d17 100%);
+  background: #050509;
 }
 
 button,
@@ -31,7 +29,7 @@ input {
 
 .app-shell {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 18rem;
+  grid-template-columns: minmax(0, 1fr) 16rem;
   gap: 1rem;
   min-height: 100vh;
   padding: 1rem;
@@ -41,11 +39,16 @@ input {
   position: relative;
   min-width: 0;
   min-height: 24rem;
+  aspect-ratio: 1260 / 682;
+  align-self: center;
   overflow: hidden;
   border: 1px solid rgb(255 255 255 / 0.12);
   border-radius: 8px;
-  background: #080a0d;
+  background:
+    radial-gradient(circle at 60% 40%, rgb(78 18 55 / 0.28), transparent 32rem),
+    #040407;
   box-shadow: 0 1rem 4rem rgb(0 0 0 / 0.28);
+  touch-action: none;
 }
 
 canvas {
@@ -81,12 +84,14 @@ canvas {
   min-width: 0;
   border-left: 1px solid rgb(255 255 255 / 0.12);
   padding: 0.5rem 0 0.5rem 1rem;
+  justify-content: center;
 }
 
 h1 {
   margin: 0;
   font-size: clamp(1.4rem, 4vw, 2.5rem);
   line-height: 1;
+  color: #ffffff;
 }
 
 label {
@@ -124,7 +129,11 @@ button:hover {
 @media (max-width: 760px) {
   .app-shell {
     grid-template-columns: 1fr;
-    grid-template-rows: minmax(24rem, 1fr) auto;
+    grid-template-rows: auto auto;
+  }
+
+  .viewport-wrap {
+    min-height: 18rem;
   }
 
   .panel {
