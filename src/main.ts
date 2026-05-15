@@ -13,8 +13,12 @@ const fpsLabel = requiredElement<HTMLSpanElement>("#fps");
 const assetCountLabel = requiredElement<HTMLSpanElement>("#asset-count");
 const parallaxInput = requiredElement<HTMLInputElement>("#parallax");
 const parallaxValue = requiredElement<HTMLOutputElement>("#parallax-value");
+const cameraZoomInput = requiredElement<HTMLInputElement>("#camera-zoom");
+const cameraZoomValue = requiredElement<HTMLOutputElement>("#camera-zoom-value");
 const lightingInput = requiredElement<HTMLInputElement>("#lighting");
 const lightingValue = requiredElement<HTMLOutputElement>("#lighting-value");
+const paperInput = requiredElement<HTMLInputElement>("#paper");
+const paperValue = requiredElement<HTMLOutputElement>("#paper-value");
 const dayCycleInput = requiredElement<HTMLInputElement>("#day-cycle");
 const dayCycleValue = requiredElement<HTMLOutputElement>("#day-cycle-value");
 const driftInput = requiredElement<HTMLInputElement>("#drift");
@@ -31,24 +35,39 @@ assetCountLabel.textContent = `${textures.length} layers`;
 
 const settings: FabulabSceneSettings = {
   parallax: Number(parallaxInput.value),
+  cameraZoom: Number(cameraZoomInput.value),
+  cameraX: 0,
+  cameraY: 0,
   drift: Number(driftInput.value),
   entrance: Number(entranceInput.value),
 };
 let lighting = Number(lightingInput.value);
+let paperStrength = Number(paperInput.value);
 let dayCycleSpeed = Number(dayCycleInput.value);
 
 const pointer: PointerState = { x: 0, y: 0 };
 let lastTimestamp = performance.now();
 let fps = 0;
+const pressedKeys = new Set<string>();
 
 parallaxInput.addEventListener("input", () => {
   settings.parallax = Number(parallaxInput.value);
   parallaxValue.value = settings.parallax.toFixed(2);
 });
 
+cameraZoomInput.addEventListener("input", () => {
+  settings.cameraZoom = Number(cameraZoomInput.value);
+  cameraZoomValue.value = settings.cameraZoom.toFixed(2);
+});
+
 lightingInput.addEventListener("input", () => {
   lighting = Number(lightingInput.value);
   lightingValue.value = lighting.toFixed(2);
+});
+
+paperInput.addEventListener("input", () => {
+  paperStrength = Number(paperInput.value);
+  paperValue.value = paperStrength.toFixed(2);
 });
 
 dayCycleInput.addEventListener("input", () => {
@@ -77,6 +96,17 @@ canvas.addEventListener("pointerleave", () => {
   pointer.y = 0;
 });
 
+window.addEventListener("keydown", (event) => {
+  const key = event.key.toLowerCase();
+  if (isCameraKey(key)) {
+    pressedKeys.add(key);
+  }
+});
+
+window.addEventListener("keyup", (event) => {
+  pressedKeys.delete(event.key.toLowerCase());
+});
+
 let resizeQueued = false;
 const resizeObserver = new ResizeObserver(() => queueResize());
 resizeObserver.observe(viewportWrap);
@@ -91,6 +121,7 @@ requestAnimationFrame(frame);
 function frame(timestamp: number): void {
   const delta = Math.max(0.001, timestamp - lastTimestamp);
   lastTimestamp = timestamp;
+  updateCamera(delta);
   fps = fps * 0.9 + (1000 / delta) * 0.1;
   fpsLabel.textContent = `${Math.round(fps)} fps`;
 
@@ -105,18 +136,16 @@ function frame(timestamp: number): void {
     timestamp,
     settings,
   );
-  const sun = createSunCycle(timestamp, canvas.width, canvas.height, dayCycleSpeed);
+  const sun = createPointerLight(timestamp, canvas.width, canvas.height, dayCycleSpeed, pointer);
   renderer.render(draws, {
     time: timestamp,
-    lightPosition: {
-      x: sun.lightPosition.x + canvas.width * pointer.x * 0.025,
-      y: sun.lightPosition.y + canvas.height * pointer.y * 0.018,
-    },
+    lightPosition: sun.lightPosition,
     lightColor: sun.lightColor,
     ambientColor: sun.ambientColor,
     clearColor: sun.clearColor,
     strength: lighting * sun.lightStrength,
     shadowStrength: lighting * sun.shadowStrength,
+    paperStrength,
   });
 
   requestAnimationFrame(frame);
@@ -139,11 +168,32 @@ function queueResize(): void {
   });
 }
 
-function createSunCycle(
+function updateCamera(deltaMs: number): void {
+  const direction = {
+    x: (pressedKeys.has("d") ? 1 : 0) - (pressedKeys.has("a") ? 1 : 0),
+    y: (pressedKeys.has("s") ? 1 : 0) - (pressedKeys.has("w") ? 1 : 0),
+  };
+  if (direction.x === 0 && direction.y === 0) {
+    return;
+  }
+
+  const length = Math.hypot(direction.x, direction.y) || 1;
+  const speed = 420 / settings.cameraZoom;
+  const step = speed * (deltaMs / 1000);
+  settings.cameraX = clamp(settings.cameraX + (direction.x / length) * step, -460, 460);
+  settings.cameraY = clamp(settings.cameraY + (direction.y / length) * step, -260, 260);
+}
+
+function isCameraKey(key: string): boolean {
+  return key === "w" || key === "a" || key === "s" || key === "d";
+}
+
+function createPointerLight(
   timestamp: number,
   width: number,
   height: number,
   speed: number,
+  pointerState: PointerState,
 ): {
   lightPosition: { x: number; y: number };
   lightColor: { r: number; g: number; b: number };
@@ -153,15 +203,16 @@ function createSunCycle(
   shadowStrength: number;
 } {
   const dayDurationMs = 64_000;
-  const cycle = ((timestamp * speed) % dayDurationMs) / dayDurationMs;
-  const angle = cycle * Math.PI * 2 - Math.PI * 0.1;
-  const heightFactor = Math.sin(angle);
-  const horizon = smoothstep(-0.18, 0.22, heightFactor);
-  const noon = smoothstep(0.35, 0.95, heightFactor);
+  const drift = (timestamp / dayDurationMs) * Math.PI * 2;
+  const pointerX = clamp01((pointerState.x + 1) * 0.5);
+  const pointerY = clamp01((pointerState.y + 1) * 0.5);
+  const x = width * clamp01(pointerX + Math.sin(drift) * speed * 0.015);
+  const y = height * clamp01(pointerY + Math.cos(drift * 0.7) * speed * 0.01);
+  const elevation = 1 - pointerY;
+  const horizon = smoothstep(0.08, 0.42, elevation);
+  const noon = smoothstep(0.52, 0.95, elevation);
   const warmEdge = (1 - noon) * horizon;
   const night = 1 - horizon;
-  const x = width * (0.5 + Math.cos(angle) * 0.62);
-  const y = height * (0.66 - heightFactor * 0.72);
 
   return {
     lightPosition: { x, y },
@@ -204,6 +255,10 @@ function mixColor(
 
 function lerp(from: number, to: number, amount: number): number {
   return from + (to - from) * clamp01(amount);
+}
+
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
 }
 
 function clamp01(value: number): number {

@@ -5,6 +5,7 @@
   "private": true,
   "scripts": {
     "generate:atlas": "bun ./scripts/generate-fabulab-atlas.ts",
+    "generate:facets": "bun ./scripts/generate-fabulab-facet-assets.ts",
     "dev": "bun ./src/index.html --console",
     "build": "bun build ./src/index.html --outdir=dist --minify",
     "typecheck": "tsc --noEmit",

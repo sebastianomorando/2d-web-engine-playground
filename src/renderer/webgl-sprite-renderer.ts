@@ -47,6 +47,7 @@ uniform vec3 u_ambient_color;
 uniform float u_time;
 uniform float u_effect_strength;
 uniform float u_shadow_strength;
+uniform float u_paper_strength;
 
 in vec2 v_uv;
 in vec2 v_position;
@@ -59,6 +60,23 @@ float heightAt(vec2 uv) {
   return dot(sampleColor.rgb, vec3(0.299, 0.587, 0.114)) * sampleColor.a;
 }
 
+float hash12(vec2 point) {
+  vec3 p3 = fract(vec3(point.xyx) * 0.1031);
+  p3 += dot(p3, p3.yzx + 33.33);
+  return fract((p3.x + p3.y) * p3.z);
+}
+
+float paperNoise(vec2 point) {
+  vec2 cell = floor(point);
+  vec2 local = fract(point);
+  local = local * local * (3.0 - 2.0 * local);
+  return mix(
+    mix(hash12(cell), hash12(cell + vec2(1.0, 0.0)), local.x),
+    mix(hash12(cell + vec2(0.0, 1.0)), hash12(cell + vec2(1.0, 1.0)), local.x),
+    local.y
+  );
+}
+
 void main() {
   vec4 texel = texture(u_texture, v_uv);
   texel.rgb *= v_color;
@@ -67,6 +85,10 @@ void main() {
   float right = heightAt(v_uv + vec2(texelSize.x, 0.0));
   float up = heightAt(v_uv - vec2(0.0, texelSize.y));
   float down = heightAt(v_uv + vec2(0.0, texelSize.y));
+  float alphaLeft = texture(u_texture, clamp(v_uv - vec2(texelSize.x, 0.0), vec2(0.0), vec2(1.0))).a;
+  float alphaRight = texture(u_texture, clamp(v_uv + vec2(texelSize.x, 0.0), vec2(0.0), vec2(1.0))).a;
+  float alphaUp = texture(u_texture, clamp(v_uv - vec2(0.0, texelSize.y), vec2(0.0), vec2(1.0))).a;
+  float alphaDown = texture(u_texture, clamp(v_uv + vec2(0.0, texelSize.y), vec2(0.0), vec2(1.0))).a;
   vec3 normal = normalize(vec3((left - right) * 4.5, (up - down) * 4.5, 1.0));
   vec2 lightOffset = (u_light_position - v_position) / max(max(u_resolution.x, u_resolution.y), 1.0);
   vec3 lightDirection = normalize(vec3(lightOffset * vec2(1.0, -1.0), 0.45));
@@ -80,6 +102,19 @@ void main() {
   float shadowAlpha = texture(u_texture, v_uv - shadowDirection * texelSize * 12.0).a * (1.0 - texel.a);
   vec3 shadowColor = vec3(0.18, 0.035, 0.09) * shadowAlpha * u_shadow_strength;
   vec3 color = mix(texel.rgb, litColor, u_effect_strength) + shadowColor;
+  float cardStrength = clamp(u_paper_strength * (0.38 + u_effect_strength * 0.32), 0.0, 0.7);
+  float coarseFiber = paperNoise(v_position * 0.42 + v_uv * u_texture_size * 0.18);
+  float fineFiber = paperNoise(v_position * 1.35 + vec2(u_time * 0.002, 0.0));
+  float strand = sin((v_position.x + v_position.y * 0.35) * 0.65 + coarseFiber * 2.0) * 0.5 + 0.5;
+  float grain = (coarseFiber - 0.5) * 0.08 + (fineFiber - 0.5) * 0.025 + (strand - 0.5) * 0.025;
+  float edge = texel.a * clamp(1.0 - min(min(alphaLeft, alphaRight), min(alphaUp, alphaDown)), 0.0, 1.0);
+  vec3 quantized = floor(color * 9.0 + 0.5) / 9.0;
+  vec3 warmPaper = color * vec3(1.035, 1.0, 0.935) + vec3(0.018, 0.012, 0.004);
+  color = mix(color, quantized, cardStrength * 0.24 * texel.a);
+  color = mix(color, warmPaper, cardStrength * 0.22 * texel.a);
+  color += vec3(grain) * cardStrength * texel.a;
+  color *= 1.0 - edge * cardStrength * 0.18;
+  color = clamp(color, vec3(0.0), vec3(1.0));
   float alpha = max(texel.a, shadowAlpha * u_shadow_strength) * v_alpha;
   out_color = vec4(color, alpha);
 }`;
@@ -103,6 +138,7 @@ export class WebGlSpriteRenderer implements SpriteRenderer {
   private readonly timeUniform: WebGLUniformLocation;
   private readonly effectStrengthUniform: WebGLUniformLocation;
   private readonly shadowStrengthUniform: WebGLUniformLocation;
+  private readonly paperStrengthUniform: WebGLUniformLocation;
   private readonly textures = new Map<string, WebGlTextureRecord>();
   private width = 1;
   private height = 1;
@@ -124,6 +160,7 @@ export class WebGlSpriteRenderer implements SpriteRenderer {
     const timeUniform = gl.getUniformLocation(program, "u_time");
     const effectStrengthUniform = gl.getUniformLocation(program, "u_effect_strength");
     const shadowStrengthUniform = gl.getUniformLocation(program, "u_shadow_strength");
+    const paperStrengthUniform = gl.getUniformLocation(program, "u_paper_strength");
 
     if (
       !vertexArray ||
@@ -135,7 +172,8 @@ export class WebGlSpriteRenderer implements SpriteRenderer {
       !ambientColorUniform ||
       !timeUniform ||
       !effectStrengthUniform ||
-      !shadowStrengthUniform
+      !shadowStrengthUniform ||
+      !paperStrengthUniform
     ) {
       throw new SpriteRendererInitError("Failed to allocate WebGL2 sprite resources", "webgl2");
     }
@@ -152,6 +190,7 @@ export class WebGlSpriteRenderer implements SpriteRenderer {
     this.timeUniform = timeUniform;
     this.effectStrengthUniform = effectStrengthUniform;
     this.shadowStrengthUniform = shadowStrengthUniform;
+    this.paperStrengthUniform = paperStrengthUniform;
 
     gl.bindVertexArray(vertexArray);
     gl.bindBuffer(gl.ARRAY_BUFFER, vertexBuffer);
@@ -280,6 +319,7 @@ export class WebGlSpriteRenderer implements SpriteRenderer {
     gl.uniform1f(this.timeUniform, resolvedEffects.time);
     gl.uniform1f(this.effectStrengthUniform, resolvedEffects.strength);
     gl.uniform1f(this.shadowStrengthUniform, resolvedEffects.shadowStrength);
+    gl.uniform1f(this.paperStrengthUniform, resolvedEffects.paperStrength);
     gl.bindVertexArray(this.vertexArray);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.vertexBuffer);
 
@@ -329,6 +369,7 @@ export class WebGlSpriteRenderer implements SpriteRenderer {
       clearColor: effects?.clearColor ?? { r: 0.01, g: 0.012, b: 0.018 },
       strength: effects?.strength ?? 0,
       shadowStrength: effects?.shadowStrength ?? 0,
+      paperStrength: effects?.paperStrength ?? 0.68,
     };
   }
 }

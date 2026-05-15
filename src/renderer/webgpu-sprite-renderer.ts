@@ -21,7 +21,7 @@ struct Uniforms {
   time: f32,
   effectStrength: f32,
   shadowStrength: f32,
-  _padding: f32,
+  paperStrength: f32,
 };
 
 @group(0) @binding(0) var<uniform> uniforms: Uniforms;
@@ -60,6 +60,23 @@ fn heightAt(uv: vec2f) -> f32 {
   return dot(sampleColor.rgb, vec3f(0.299, 0.587, 0.114)) * sampleColor.a;
 }
 
+fn hash12(point: vec2f) -> f32 {
+  var p3 = fract(vec3f(point.x, point.y, point.x) * 0.1031);
+  p3 = p3 + dot(p3, p3.yzx + vec3f(33.33));
+  return fract((p3.x + p3.y) * p3.z);
+}
+
+fn paperNoise(point: vec2f) -> f32 {
+  let cell = floor(point);
+  var local = fract(point);
+  local = local * local * (vec2f(3.0) - 2.0 * local);
+  return mix(
+    mix(hash12(cell), hash12(cell + vec2f(1.0, 0.0)), local.x),
+    mix(hash12(cell + vec2f(0.0, 1.0)), hash12(cell + vec2f(1.0, 1.0)), local.x),
+    local.y
+  );
+}
+
 @fragment
 fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   var texel = textureSample(spriteTexture, spriteSampler, input.uv);
@@ -70,6 +87,10 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   let right = heightAt(input.uv + vec2f(texelSize.x, 0.0));
   let up = heightAt(input.uv - vec2f(0.0, texelSize.y));
   let down = heightAt(input.uv + vec2f(0.0, texelSize.y));
+  let alphaLeft = textureSample(spriteTexture, spriteSampler, clamp(input.uv - vec2f(texelSize.x, 0.0), vec2f(0.0), vec2f(1.0))).a;
+  let alphaRight = textureSample(spriteTexture, spriteSampler, clamp(input.uv + vec2f(texelSize.x, 0.0), vec2f(0.0), vec2f(1.0))).a;
+  let alphaUp = textureSample(spriteTexture, spriteSampler, clamp(input.uv - vec2f(0.0, texelSize.y), vec2f(0.0), vec2f(1.0))).a;
+  let alphaDown = textureSample(spriteTexture, spriteSampler, clamp(input.uv + vec2f(0.0, texelSize.y), vec2f(0.0), vec2f(1.0))).a;
   let normal = normalize(vec3f((left - right) * 4.5, (up - down) * 4.5, 1.0));
   let lightOffset = (uniforms.lightPosition - input.positionPx) / max(max(uniforms.resolution.x, uniforms.resolution.y), 1.0);
   let lightDirection = normalize(vec3f(lightOffset * vec2f(1.0, -1.0), 0.45));
@@ -82,7 +103,20 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4f {
   let shadowDirection = normalize(lightOffset + vec2f(0.0001));
   let shadowAlpha = textureSample(spriteTexture, spriteSampler, input.uv - shadowDirection * texelSize * 12.0).a * (1.0 - texel.a);
   let shadowColor = vec3f(0.18, 0.035, 0.09) * shadowAlpha * uniforms.shadowStrength;
-  let color = mix(texel.rgb, litColor, uniforms.effectStrength) + shadowColor;
+  var color = mix(texel.rgb, litColor, uniforms.effectStrength) + shadowColor;
+  let cardStrength = clamp(uniforms.paperStrength * (0.38 + uniforms.effectStrength * 0.32), 0.0, 0.7);
+  let coarseFiber = paperNoise(input.positionPx * 0.42 + input.uv * dimensions * 0.18);
+  let fineFiber = paperNoise(input.positionPx * 1.35 + vec2f(uniforms.time * 0.002, 0.0));
+  let strand = sin((input.positionPx.x + input.positionPx.y * 0.35) * 0.65 + coarseFiber * 2.0) * 0.5 + 0.5;
+  let grain = (coarseFiber - 0.5) * 0.08 + (fineFiber - 0.5) * 0.025 + (strand - 0.5) * 0.025;
+  let edge = texel.a * clamp(1.0 - min(min(alphaLeft, alphaRight), min(alphaUp, alphaDown)), 0.0, 1.0);
+  let quantized = floor(color * 9.0 + vec3f(0.5)) / vec3f(9.0);
+  let warmPaper = color * vec3f(1.035, 1.0, 0.935) + vec3f(0.018, 0.012, 0.004);
+  color = mix(color, quantized, cardStrength * 0.24 * texel.a);
+  color = mix(color, warmPaper, cardStrength * 0.22 * texel.a);
+  color = color + vec3f(grain) * cardStrength * texel.a;
+  color = color * (1.0 - edge * cardStrength * 0.18);
+  color = clamp(color, vec3f(0.0), vec3f(1.0));
   let alpha = max(texel.a, shadowAlpha * uniforms.shadowStrength) * input.alpha;
   return vec4f(color, alpha);
 }`;
@@ -365,7 +399,7 @@ export class WebGpuSpriteRenderer implements SpriteRenderer {
       resolvedEffects.time,
       resolvedEffects.strength,
       resolvedEffects.shadowStrength,
-      0,
+      resolvedEffects.paperStrength,
     ]);
     this.device.queue.writeBuffer(this.uniformBuffer, 0, uniforms);
 
@@ -437,6 +471,7 @@ export class WebGpuSpriteRenderer implements SpriteRenderer {
       clearColor: effects?.clearColor ?? { r: 0.01, g: 0.012, b: 0.018 },
       strength: effects?.strength ?? 0,
       shadowStrength: effects?.shadowStrength ?? 0,
+      paperStrength: effects?.paperStrength ?? 0.68,
     };
   }
 }

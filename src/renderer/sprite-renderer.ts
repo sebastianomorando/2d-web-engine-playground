@@ -52,6 +52,7 @@ export interface SpriteRenderEffects {
   };
   strength: number;
   shadowStrength: number;
+  paperStrength: number;
 }
 
 export interface SpriteRenderer {
