@@ -20,6 +20,13 @@
       <aside class="panel">
         <h1>Fabulab Scene</h1>
         <label>
+          Scene
+          <select id="scene-select">
+            <option value="scene_1">Scene 1</option>
+            <option value="scene_2">Scene 2</option>
+          </select>
+        </label>
+        <label>
           Parallax
           <input id="parallax" type="range" min="0" max="2" step="0.01" value="0.10" />
           <output id="parallax-value">0.10</output>
@@ -38,6 +45,11 @@
           Paper FX
           <input id="paper" type="range" min="0" max="1" step="0.01" value="0.68" />
           <output id="paper-value">0.68</output>
+        </label>
+        <label>
+          Pixel FX
+          <input id="pixel" type="range" min="0" max="1" step="0.01" value="0" />
+          <output id="pixel-value">0.00</output>
         </label>
         <label>
           Day Cycle

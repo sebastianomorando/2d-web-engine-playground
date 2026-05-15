@@ -1,6 +1,7 @@
 import {
   FABULAB_TEXTURE_SOURCES,
   createFabulabScene,
+  type FabulabSceneId,
   type FabulabSceneSettings,
   type PointerState,
 } from "./engine/fabulab-scene";
@@ -11,6 +12,7 @@ const viewportWrap = requiredElement<HTMLElement>(".viewport-wrap");
 const backendLabel = requiredElement<HTMLSpanElement>("#backend");
 const fpsLabel = requiredElement<HTMLSpanElement>("#fps");
 const assetCountLabel = requiredElement<HTMLSpanElement>("#asset-count");
+const sceneSelect = requiredElement<HTMLSelectElement>("#scene-select");
 const parallaxInput = requiredElement<HTMLInputElement>("#parallax");
 const parallaxValue = requiredElement<HTMLOutputElement>("#parallax-value");
 const cameraZoomInput = requiredElement<HTMLInputElement>("#camera-zoom");
@@ -19,6 +21,8 @@ const lightingInput = requiredElement<HTMLInputElement>("#lighting");
 const lightingValue = requiredElement<HTMLOutputElement>("#lighting-value");
 const paperInput = requiredElement<HTMLInputElement>("#paper");
 const paperValue = requiredElement<HTMLOutputElement>("#paper-value");
+const pixelInput = requiredElement<HTMLInputElement>("#pixel");
+const pixelValue = requiredElement<HTMLOutputElement>("#pixel-value");
 const dayCycleInput = requiredElement<HTMLInputElement>("#day-cycle");
 const dayCycleValue = requiredElement<HTMLOutputElement>("#day-cycle-value");
 const driftInput = requiredElement<HTMLInputElement>("#drift");
@@ -32,8 +36,11 @@ assetCountLabel.textContent = "loading";
 
 const textures = await renderer.loadTextures(FABULAB_TEXTURE_SOURCES);
 assetCountLabel.textContent = `${textures.length} layers`;
+const initialSceneId = normalizeSceneId(new URL(window.location.href).searchParams.get("scene") ?? sceneSelect.value);
+sceneSelect.value = initialSceneId;
 
 const settings: FabulabSceneSettings = {
+  sceneId: initialSceneId,
   parallax: Number(parallaxInput.value),
   cameraZoom: Number(cameraZoomInput.value),
   cameraX: 0,
@@ -43,12 +50,19 @@ const settings: FabulabSceneSettings = {
 };
 let lighting = Number(lightingInput.value);
 let paperStrength = Number(paperInput.value);
+let pixelStrength = Number(pixelInput.value);
 let dayCycleSpeed = Number(dayCycleInput.value);
 
 const pointer: PointerState = { x: 0, y: 0 };
 let lastTimestamp = performance.now();
 let fps = 0;
 const pressedKeys = new Set<string>();
+
+sceneSelect.addEventListener("change", () => {
+  settings.sceneId = normalizeSceneId(sceneSelect.value);
+  settings.cameraX = 0;
+  settings.cameraY = 0;
+});
 
 parallaxInput.addEventListener("input", () => {
   settings.parallax = Number(parallaxInput.value);
@@ -68,6 +82,12 @@ lightingInput.addEventListener("input", () => {
 paperInput.addEventListener("input", () => {
   paperStrength = Number(paperInput.value);
   paperValue.value = paperStrength.toFixed(2);
+});
+
+pixelInput.addEventListener("input", () => {
+  pixelStrength = Number(pixelInput.value);
+  pixelValue.value = pixelStrength.toFixed(2);
+  resize();
 });
 
 dayCycleInput.addEventListener("input", () => {
@@ -153,7 +173,9 @@ function frame(timestamp: number): void {
 
 function resize(): void {
   const rect = canvas.getBoundingClientRect();
-  renderer.resize(rect.width, rect.height, window.devicePixelRatio || 1);
+  const renderScale = lerp(1, 0.18, pixelStrength);
+  canvas.style.imageRendering = pixelStrength > 0.01 ? "pixelated" : "auto";
+  renderer.resize(rect.width, rect.height, (window.devicePixelRatio || 1) * renderScale);
 }
 
 function queueResize(): void {
@@ -186,6 +208,10 @@ function updateCamera(deltaMs: number): void {
 
 function isCameraKey(key: string): boolean {
   return key === "w" || key === "a" || key === "s" || key === "d";
+}
+
+function normalizeSceneId(value: string): FabulabSceneId {
+  return value === "scene_2" ? "scene_2" : "scene_1";
 }
 
 function createPointerLight(

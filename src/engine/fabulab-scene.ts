@@ -9,6 +9,16 @@ import roccia01Url from "../assets/fabulab-scene/roccia01.svg";
 import roccia02Url from "../assets/fabulab-scene/roccia02.svg";
 import roccia03Url from "../assets/fabulab-scene/roccia03.svg";
 import roccia04Url from "../assets/fabulab-scene/roccia04.svg";
+import scena2CavaliereUrl from "../assets/fabulab-scene-2/scena2_cavaliere.svg";
+import scena2CavaliereSpadaUrl from "../assets/fabulab-scene-2/scena2_cavaliere_spada.svg";
+import scena2Grotta00Url from "../assets/fabulab-scene-2/scena2_grotta00.svg";
+import scena2Grotta01Url from "../assets/fabulab-scene-2/scena2_grotta01.svg";
+import scena2Grotta02Url from "../assets/fabulab-scene-2/scena2_grotta02.svg";
+import scena2Roccia01Url from "../assets/fabulab-scene-2/scena2_roccia01.svg";
+import scena2Roccia02Url from "../assets/fabulab-scene-2/scena2_roccia02.svg";
+import scena2Roccia03Url from "../assets/fabulab-scene-2/scena2_roccia03.svg";
+import scena2Roccia04Url from "../assets/fabulab-scene-2/scena2_roccia04.svg";
+import scena2Roccia05Url from "../assets/fabulab-scene-2/scena2_roccia05.svg";
 import {
   FABULAB_FACET_TEXTURE_SOURCE_BY_LAYER,
   FABULAB_FACET_TEXTURE_SOURCES,
@@ -24,6 +34,7 @@ import {
 import { trianglesFromQuad, type SpriteDraw, type SpriteTexture, type SpriteTextureSource, type SpriteVertex } from "../renderer/sprite-renderer";
 
 export interface FabulabSceneSettings {
+  sceneId: FabulabSceneId;
   parallax: number;
   cameraZoom: number;
   cameraX: number;
@@ -31,6 +42,8 @@ export interface FabulabSceneSettings {
   drift: number;
   entrance: number;
 }
+
+export type FabulabSceneId = "scene_1" | "scene_2";
 
 export interface PointerState {
   x: number;
@@ -50,9 +63,15 @@ interface LayerSource {
   yVw: number;
   zVw: number;
   scale: number;
+  displayWidth?: number;
+  displayHeight?: number;
   floatX?: number;
   floatY?: number;
+  bobYVw?: number;
+  bobSpeed?: number;
+  bobPhase?: number;
   entranceYVw?: number;
+  alpha?: number;
 }
 
 interface Layer extends LayerSource {
@@ -118,10 +137,20 @@ export const FABULAB_TEXTURE_SOURCES: readonly SpriteTextureSource[] = [
   { id: "roccia02", url: roccia02Url, logicalWidth: 352.29, logicalHeight: 331.04 },
   { id: "roccia03", url: roccia03Url, logicalWidth: 445.43, logicalHeight: 650.2 },
   { id: "roccia04", url: roccia04Url, logicalWidth: 502.29, logicalHeight: 471.99 },
+  { id: "scena2_cavaliere", url: scena2CavaliereUrl, logicalWidth: 382.04, logicalHeight: 459.95 },
+  { id: "scena2_cavaliere_spada", url: scena2CavaliereSpadaUrl, logicalWidth: 400.7, logicalHeight: 648.6 },
+  { id: "scena2_grotta00", url: scena2Grotta00Url, logicalWidth: 2557.9, logicalHeight: 1780.3 },
+  { id: "scena2_grotta01", url: scena2Grotta01Url, logicalWidth: 2214, logicalHeight: 1245.37 },
+  { id: "scena2_grotta02", url: scena2Grotta02Url, logicalWidth: 3000, logicalHeight: 2000 },
+  { id: "scena2_roccia01", url: scena2Roccia01Url, logicalWidth: 117.94, logicalHeight: 193.77 },
+  { id: "scena2_roccia02", url: scena2Roccia02Url, logicalWidth: 135.72, logicalHeight: 354.14 },
+  { id: "scena2_roccia03", url: scena2Roccia03Url, logicalWidth: 963.29, logicalHeight: 453.67 },
+  { id: "scena2_roccia04", url: scena2Roccia04Url, logicalWidth: 117.94, logicalHeight: 193.77 },
+  { id: "scena2_roccia05", url: scena2Roccia05Url, logicalWidth: 135.72, logicalHeight: 354.14 },
   ...FABULAB_FACET_TEXTURE_SOURCES,
 ];
 
-const LAYERS: readonly LayerSource[] = [
+const SCENE1_LAYERS: readonly LayerSource[] = [
   { id: "cielo", url: cieloUrl, xVw: 14, yVw: -16, zVw: -120, scale: 4, floatX: 0.25 },
   { id: "nuvole_1", url: nuvole1Url, xVw: -14, yVw: 14, zVw: -92, scale: 2.5, floatX: 1.1 },
   { id: "fiume", url: fiumeUrl, xVw: -42, yVw: 51, zVw: -88, scale: 2, floatY: 0.35 },
@@ -133,6 +162,48 @@ const LAYERS: readonly LayerSource[] = [
   { id: "roccia02", url: roccia02Url, xVw: -2, yVw: 28, zVw: -41, scale: 0.35, entranceYVw: -18 },
   { id: "roccia03", url: roccia03Url, xVw: 60, yVw: 51, zVw: -41, scale: 0.5, entranceYVw: -28 },
   { id: "roccia04", url: roccia04Url, xVw: 90, yVw: 75, zVw: -40, scale: 0.5, entranceYVw: -31 },
+];
+
+const SCENE2_LAYERS: readonly LayerSource[] = [
+  {
+    id: "scena2_grotta00",
+    url: scena2Grotta00Url,
+    xVw: 8,
+    yVw: -49,
+    zVw: -228,
+    scale: 5,
+    displayWidth: DESIGN_WIDTH,
+    displayHeight: 876.77,
+    floatX: 0.08,
+  },
+  {
+    id: "scena2_grotta01",
+    url: scena2Grotta01Url,
+    xVw: -3,
+    yVw: -5,
+    zVw: -100,
+    scale: 3.2,
+    displayWidth: DESIGN_WIDTH,
+    displayHeight: 708.8,
+    floatX: -0.12,
+  },
+  { id: "scena2_roccia04", url: scena2Roccia04Url, xVw: -52, yVw: -7, zVw: -118, scale: 1.3, bobYVw: 2.8, bobSpeed: 0.001, bobPhase: 3.1 },
+  { id: "scena2_roccia01", url: scena2Roccia01Url, xVw: 76, yVw: -2, zVw: -52, scale: 1.05, bobYVw: 4.5, bobSpeed: 0.00085 },
+  { id: "scena2_roccia05", url: scena2Roccia05Url, xVw: 64, yVw: 23, zVw: -24, scale: 0.85, bobYVw: 5.5, bobSpeed: 0.0007, bobPhase: 4.4 },
+  { id: "scena2_roccia02", url: scena2Roccia02Url, xVw: -47, yVw: 43, zVw: -22, scale: 1.55, bobYVw: 3.5, bobSpeed: 0.0009, bobPhase: 1.7 },
+  { id: "scena2_roccia03", url: scena2Roccia03Url, xVw: 12, yVw: 48, zVw: -41, scale: 1.55, floatY: 0.04 },
+  {
+    id: "scena2_grotta02",
+    url: scena2Grotta02Url,
+    xVw: -5,
+    yVw: -9,
+    zVw: -10,
+    scale: 1.9,
+    displayWidth: DESIGN_WIDTH,
+    displayHeight: 840,
+    floatX: 0.04,
+  },
+  { id: "scena2_cavaliere", url: scena2CavaliereUrl, xVw: 35, yVw: 21, zVw: -34, scale: 0.86, floatY: 0.08 },
 ];
 
 const TREE_LAYER: LayerSource = {
@@ -161,8 +232,22 @@ export function createFabulabScene(
   time: number,
   settings: FabulabSceneSettings,
 ): readonly SpriteDraw[] {
+  if (settings.sceneId === "scene_2") {
+    return createScene2(textures, viewport, pointer, time, settings);
+  }
+
+  return createScene1(textures, viewport, pointer, time, settings);
+}
+
+function createScene1(
+  textures: readonly SpriteTexture[],
+  viewport: ViewportState,
+  pointer: PointerState,
+  time: number,
+  settings: FabulabSceneSettings,
+): readonly SpriteDraw[] {
   const textureMap = new Map(textures.map((texture) => [texture.id, texture]));
-  const layers = LAYERS.map((layer) => {
+  const layers = SCENE1_LAYERS.map((layer) => {
     const texture = textureMap.get(layer.id);
     if (!texture) {
       return undefined;
@@ -215,9 +300,46 @@ export function createFabulabScene(
   return draws;
 }
 
+function createScene2(
+  textures: readonly SpriteTexture[],
+  viewport: ViewportState,
+  pointer: PointerState,
+  time: number,
+  settings: FabulabSceneSettings,
+): readonly SpriteDraw[] {
+  const textureMap = new Map(textures.map((texture) => [texture.id, texture]));
+
+  return SCENE2_LAYERS.map((layer) => {
+    const texture = textureMap.get(layer.id);
+    if (!texture) {
+      return undefined;
+    }
+
+    const projected = createProjectedLayer(
+      {
+        ...layer,
+        width: layer.displayWidth ?? texture.width,
+        height: layer.displayHeight ?? texture.height,
+      },
+      viewport,
+      pointer,
+      time,
+      settings,
+    );
+    return {
+      zVw: layer.zVw,
+      draw: projectLayer(layer.id, projected, layer.alpha ?? 1),
+    };
+  })
+    .filter((entry): entry is { zVw: number; draw: SpriteDraw } => Boolean(entry))
+    .sort((a, b) => a.zVw - b.zVw)
+    .map((entry) => entry.draw);
+}
+
 function projectLayer(
   textureId: string,
   projected: ProjectedLayer,
+  alpha = 1,
 ): SpriteDraw {
   const corners = projectRect(projected, 0, 0, projected.baseWidth, projected.baseHeight, {
     u0: 0,
@@ -228,7 +350,7 @@ function projectLayer(
 
   return {
     textureId,
-    vertices: corners,
+    vertices: corners.map((vertex) => ({ ...vertex, alpha })),
   };
 }
 
@@ -400,9 +522,10 @@ function createProjectedLayer(
   };
   const perspective = DESIGN_WIDTH * 0.5;
   const drift = Math.sin(time * 0.00025 + layer.zVw) * settings.drift;
+  const bob = Math.sin(time * (layer.bobSpeed ?? 0.0008) + (layer.bobPhase ?? layer.zVw)) * (layer.bobYVw ?? 0);
   const x = layer.xVw * unit + (layer.floatX ?? 0) * drift * unit;
   const finalYVw = lerp(layer.entranceYVw ?? layer.yVw, layer.yVw, settings.entrance);
-  const y = finalYVw * unit + (layer.floatY ?? 0) * drift * unit;
+  const y = (finalYVw + bob) * unit + (layer.floatY ?? 0) * drift * unit;
   const z = layer.zVw * unit;
   const baseWidth = layer.width;
   const baseHeight = layer.height;
